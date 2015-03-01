@@ -1,0 +1,1149 @@
+<!doctype html>
+<html>
+    <head>
+        <meta name="viewport" content="initial-scale=1.0; maximum-scale=1.0; minimum-scale=1.0; user-scalable=no; width=device-width" />
+        <meta charset="UTF-8">
+        <link rel="stylesheet" href="assets/css/styles.css" type="text/css" />
+        <link href='assets/css/font.css' rel='stylesheet' type='text/css' />
+        <link href='assets/css/toastr.min.css' rel='stylesheet' type='text/css' />
+
+	<script type="text/javascript" src="assets/js/jquery-2.1.1.min.js"></script>
+	<script type="text/javascript" src="assets/js/jquery.autosize.js"></script>
+	<script type="text/javascript" src="assets/js/jquery.actualheight.js"></script>
+	<script type="text/javascript" src="assets/js/jquery.caret.1.02.min.js"></script>
+	<script type="text/javascript" src="assets/js/photoresize.js"></script>
+	<script type="text/javascript" src="assets/js/toastr.min.js"></script>
+	<script type="text/javascript" src="assets/js/json.js"></script>
+	<script type="text/javascript">
+var selectedUid = null;
+var selectedType = 0;
+
+$(document).ready(function () {
+    $(".search").css('border-color', 'rgba(100,100,100,0)');
+    $(".search").mouseover(function () {
+        $({
+            alpha: 0
+        }).animate({
+            alpha: 1
+        }, {
+            duration: 500,
+            step: function () {
+                $('.search').css('border-color', 'rgba(100,100,100,' + this.alpha + ')');
+            }
+        });
+    });
+    $(".search").mouseout(function () {
+        $({
+            alpha: 1
+        }).animate({
+            alpha: 0
+        }, {
+            duration: 500,
+            step: function () {
+                $('.search').css('border-color', 'rgba(100,100,100,' + this.alpha + ')');
+            }
+        });
+    });
+
+    $(".newnote").focus(function () {
+        $(".entryText").css("min-height", "100px");
+        inputFocus(this);
+    });
+
+    $(".newnote").blur(function () {
+        $(".entryText").css("min-height", "50px");
+        inputBlur(this);
+    });
+    $(".newnote").each(function () {
+        inputFocus(this);
+        inputBlur(this);
+    });
+
+    $('.entryTitle').bind("enterKey", function (e) {
+        setCaretToPos(document.getElementById("entryText"), 0);
+        $(".entryText").focus();
+    });
+
+    $('.entryTitle').keyup(function (e) {
+        if (e.keyCode == 13) {
+            $(this).trigger("enterKey");
+        }
+    });
+
+    var prevText = 0;
+
+    $('.entryText').keyup(function (e) {
+        if (e.keyCode == 8) {
+            if ($(this).getCursorPosition() == 0 && prevText == 0) {
+                $(".entryTitle").focus();
+                var v = $(".entryTitle").val();
+                $(".entryTitle").val("");
+                $(".entryTitle").val(v);
+            }
+        }
+        prevText = $(this).getCursorPosition();
+    });
+
+    $(".entryText").autosize();
+
+    $('.showTitle').bind("enterKey", function (e) {
+        if(selectedType == 0) {
+            setCaretToPos(document.getElementById("showText"), 0);
+            $(".showText").focus();
+        } else if(selectedType == 1) {
+            $("#showList input[type=text]").get(0).focus();
+        }
+    });
+
+    $('.showTitle').keyup(function (e) {
+        if (e.keyCode == 13) {
+            $(this).trigger("enterKey");
+        }
+        updateDT(new Date().getTime());
+    });
+
+    var prevTextShow = 0;
+
+    $('.showText').keyup(function (e) {
+        if (e.keyCode == 8) {
+            if ($(this).getCursorPosition() == 0 && prevTextShow == 0) {
+                $(".showTitle").focus();
+                var v = $(".showTitle").val();
+                $(".showTitle").val("");
+                $(".showTitle").val(v);
+            }
+        }
+        prevText = $(this).getCursorPosition();
+        updateDT(new Date().getTime());
+    });
+    $(".showText").autosize();
+
+    $("#saveEntry").click(function () {
+        var title = $(".entryTitle").val();
+        var text = $(".entryText").val();
+        var ttl = document.getElementById("entryTitle");
+        var txt = document.getElementById("entryText");
+        if (title == "" || ttl.value == ttl.defaultValue) title = "";
+        if (text == "" || txt.value == txt.defaultValue) if(title == "") return; else text = "";
+        resetField($(".entryTitle"));
+        resetField($(".entryText"));
+        var uuid = guid();
+        addcardText(uuid, title, text, 0);
+        $(".entryText").trigger('autosize.resize');
+            send($.toJSON({
+                'type': "ins-note",
+                'uid': (uuid).replace('-','.'),
+                'title': title,
+                'text': text,
+                'typ': 0,
+                'dt': new Date().getTime(),
+                'col': "white",
+                'img': ""
+                }));
+    });
+
+    $("#expandEntry").click(function () {
+        var showCard = $('#showCard');
+        showCard.css('visibility', 'visible');
+        showCard.css('position', 'fixed');
+        var Xoffset = $(".cardEntry").position();
+        var Xwid = $(".cardEntry").width();
+        var Xheit = $(".cardEntry").height();
+        showCard.css('top', (Xoffset.top + 61) + "px");
+        showCard.css('left', Xoffset.left + "px");
+        showCard.css('width', Xwid + "px");
+        showCard.css('height', Xheit + "px");
+
+        doShowModal(showCard);
+        selectedUid = null;
+
+        var title = $(".entryTitle").val();
+        var text = $(".entryText").val();
+        var ttl = document.getElementById("entryTitle");
+        var txt = document.getElementById("entryText");
+        if (title == "" || ttl.value == ttl.defaultValue) title = "";
+        if (text == "" || txt.value == txt.defaultValue) text = "";
+        resetField($(".entryTitle"));
+        resetField($(".entryText"));
+
+        $(".showTitle").val(title);
+        updateField($(".showTitle"));
+        selectedType = 0;
+        if(selectedType == 0) {
+            $("#showList").hide();
+            $(".showText").show();
+            $(".showText").val(text);
+            updateField($(".showText"));
+            $(".showText").trigger('autosize.resize');
+        }
+        updateDT(new Date().getTime());
+        showCard.data("colour", "white");
+        setColour("white", showCard);
+        $("#showImg").hide();
+        $("#showCard").data("img", "");
+    });
+
+
+    $("#saveShown").click(function () {
+        var insert = 0;
+        if(selectedUid == null)
+            insert=1;
+        var title = $(".showTitle").val();
+        var ttl = document.getElementById("showTitle");
+        if (title == "" || ttl.value == ttl.defaultValue) title = "";
+        var img = $("#showCard").data("img");
+        var titleEl = ((img == null || img == "") ? (title.trim()==""?"":"<h1 class=\"title\">" + title + "</h1>") : "<div class=\"card-image\" style=\"background-image: url('" + img + "')\">" + (title.trim() == "" ? "" : "<div class=\"banner\"></div>\
+                        <h1 class=\"title\">" + title + "</h1>") +
+        "</div>");
+
+        if(selectedType == 0) {
+            var text = $(".showText").val();
+            var txt = document.getElementById("showText");
+            if (text == "" || txt.value == txt.defaultValue) if(title == "") return; else text="";
+            resetField($(".showTitle"));
+            resetField($(".showText"));
+            if(selectedUid == null) {
+                selectedUid=guid();
+                addcardText(selectedUid, title, text, 0, $("#timestamp").data("dt"), $("#showCard").data("colour"), $("#showCard").data("img"));
+            } else {
+                $("#card" + selectedUid).data("title", title);
+                $("#card" + selectedUid).data("text", text);
+                $("#card" + selectedUid).data("img", img);
+                $("#card" + selectedUid).data("type", selectedType);
+                $("#card"+selectedUid).find(".titleCont").empty().html(titleEl);
+                var txt = "";
+                if (text.length > 280) {
+                    txt = text.substring(0, 280) + "...";
+                } else txt = text;
+                txt = txt.replace(/(\r\n|\n|\r)/gm, "<br />");
+                $("#card"+selectedUid).find(".text").html(txt);
+            }
+        } else if(selectedType == 1) {
+            var text = $("#showList").data("value");
+            $("#showList").data("value", "");
+            //listEditor();
+            resetField($(".showTitle"));
+
+            if(selectedUid == null) {
+                selectedUid = guid();
+                addcardText(selectedUid, title, text, 1, $("#timestamp").data("dt"), $("#showCard").data("colour"), $("#showCard").data("img"));
+            } else {
+                $("#card" + selectedUid).data("title", title);
+                $("#card" + selectedUid).data("text", text);
+                $("#card" + selectedUid).data("img", img);
+                $("#card" + selectedUid).data("type", selectedType);
+                $("#card"+selectedUid).find(".titleCont").empty().html(titleEl);
+                renderList(selectedUid, text, $("#card"+selectedUid).find(".text"), 3);
+            }
+        }
+        $("#card"+selectedUid).data("dt", $("#timestamp").data("dt"));
+        $("#card"+selectedUid).data("img", $("#showCard").data("img"));
+        $("#card"+selectedUid).data("colour", $("#showCard").data("colour"));
+        setColour($("#showCard").data("colour"), $("#card"+selectedUid));
+
+        if(insert == 0) {
+            send($.toJSON({
+                'type': "upd-note",
+                'uid': (selectedUid+"").replace('-','.'),
+                'title': title,
+                'text': text,
+                'typ': selectedType,
+                'dt': $("#timestamp").data("dt"),
+                'col': $("#showCard").data("colour"),
+                'img': $("#showCard").data("img")
+            }));
+        } else {
+            send($.toJSON({
+                'type': "ins-note",
+                'uid': (selectedUid+"").replace('-','.'),
+                'title': title,
+                'text': text,
+                'typ': selectedType,
+                'dt': $("#timestamp").data("dt"),
+                'col': $("#showCard").data("colour"),
+                'img': $("#showCard").data("img")
+             }));
+        }
+
+        closeCard();
+
+    });
+    $('body').keypress(function(e){
+        if(e.keyCode == 27){
+            if(showingPic == 0)
+                closeCard();
+            else {
+                showingPic=0;
+                $("#expandedPicCont").hide();
+            }
+        }
+
+
+    });
+
+$("#colwhite").click(function(){
+$("#showCard").css("background-color", $(this).css("background-color"));
+$("#showCard").data("colour", "white");
+        updateDT(new Date().getTime());
+});
+$("#colred").click(function(){
+$("#showCard").data("colour", "red");
+$("#showCard").css("background-color", $(this).css("background-color"));
+        updateDT(new Date().getTime());
+});
+$("#colorange").click(function(){
+$("#showCard").data("colour", "orange");
+$("#showCard").css("background-color", $(this).css("background-color"));
+        updateDT(new Date().getTime());
+});
+$("#colyellow").click(function(){
+$("#showCard").data("colour", "yellow");
+$("#showCard").css("background-color", $(this).css("background-color"));
+        updateDT(new Date().getTime());
+});
+$("#colgrey").click(function(){
+$("#showCard").data("colour", "grey");
+$("#showCard").css("background-color", $(this).css("background-color"));
+        updateDT(new Date().getTime());
+});
+$("#colcyan").click(function(){
+$("#showCard").data("colour", "cyan");
+$("#showCard").css("background-color", $(this).css("background-color"));
+        updateDT(new Date().getTime());
+});
+$("#colturq").click(function(){
+$("#showCard").data("colour", "turq");
+$("#showCard").css("background-color", $(this).css("background-color"));
+        updateDT(new Date().getTime());
+});
+$("#collime").click(function(){
+$("#showCard").data("colour", "lime");
+$("#showCard").css("background-color", $(this).css("background-color"));
+        updateDT(new Date().getTime());
+});
+
+
+    $("#chooseImage").change(function(e) {
+
+    for (var i = 0; i < $("#chooseImage").get(0).files.length; i++) {
+        var file = $("#chooseImage").get(0).files[i];
+
+        var reader = new FileReader();
+        reader.onloadend = function() {
+            $("#showCard").data("img", reader.result);
+            $("#showImg").show();
+            $("#showImg").css("background-image", "url("+reader.result+")");
+        }
+        reader.readAsDataURL(file);
+    }
+        updateDT(new Date().getTime());
+    });
+
+$("#delImg>a").click(function(e){
+removeImg(e);
+});
+
+$('.search').keyup(function (e) {
+        if (e.keyCode == 13) {
+            var sterm = $('.search').val();
+            if(sterm.trim() != ""){
+                $(".card").each(function(){
+                    var sho = 0;
+                    if($(this).data("title") != null && $(this).data("title").toLowerCase().indexOf(sterm) > -1) {
+                        sho=1;
+                    }
+                    if($(this).data("text") != null && $(this).data("text").toLowerCase().indexOf(sterm) > -1) {
+                        sho=1;
+                    }
+
+                    if(sho==0 && $(this).attr("id") != "showCard") $(this).fadeOut(200);
+                    if(sho==1) $(this).fadeIn(200);
+                });
+            } else $(".card").each(function(){
+                    $(this).fadeIn(200);
+                });
+        }
+    });
+
+    send('{"type":"document-ready"}');
+
+});
+
+function setColour(col, div) {
+div.css("background-color", $("#col"+col).css("background-color"));
+}
+
+function resetField(field) {
+    field.val(field.prop("defaultValue"));
+    field.css("opacity", 0.6);
+}
+
+function updateField(field) {
+    if(field.val() == "") resetField(field);
+    else field.css("opacity", 1);
+}
+
+function guid() {
+    function _p8(s) {
+        var p = (Math.random().toString(16) + "000000000").substr(2, 8);
+        return s ? "-" + p.substr(0, 4) + "-" + p.substr(4, 4) : p;
+    }
+    return _p8() + _p8(true) + _p8(true) + _p8();
+}
+
+function setSelectionRange(input, selectionStart, selectionEnd) {
+    if (input.setSelectionRange) {
+        input.focus();
+        input.setSelectionRange(selectionStart, selectionEnd);
+    } else if (input.createTextRange) {
+        var range = input.createTextRange();
+        range.collapse(true);
+        range.moveEnd('character', selectionEnd);
+        range.moveStart('character', selectionStart);
+        range.select();
+    }
+}
+
+function setCaretToPos(input, pos) {
+    setSelectionRange(input, pos, pos);
+}
+
+var addLeft = true;
+
+function addcardText(uid, title, text, type, dt, colour, img) {
+    var col;
+    if (addLeft)
+        col = $(".leftColumn");
+    else
+        col = $(".rightColumn");
+    addLeft = !addLeft;
+
+    uid=uid.replace(".", "-")
+    var txt = "";
+    if (text.length > 280) {
+       txt = text.substring(0, 280) + "...";
+    } else txt = text;
+    txt = txt.replace(/(\r\n|\n|\r)/gm, "<br />");
+    img = (img==""?null:img);
+
+    var titleEl = "<div class=\"titleCont\">"+(img == null? (title==""?"":"<h1 class=\"title\">" + title + "</h1>") : "<div class=\"card-image\" style=\"background-image: url('" + img + "')\">" + (title == "" ? "" : "<div class=\"banner\"></div>\
+                        <h2 class=\"title\">" + title + "</h2>") +
+        "</div>")+"</div>";
+
+    col.prepend("<div class=\"card\" id=\"card" + uid + "\" style=\"cursor: pointer;display:none;\" onclick=\"cardClick('" + uid + "')\">\
+                <div class=\"opwrapper2\"><div class=\"opwrapper\"><div class=\"bin\"><img src=\"assets/images/bin.png\" width=\"15px\" height=\"19px\" /></div><div class=\"archive\"><img style=\"margin-top:1px\" src=\"assets/images/archive.png\" height=\"17px\" width=\"18px\" /></div></div></div>\
+                    "+titleEl+"\
+                    <p class=\"text\">" + (type == 0? txt: "") + "</p>\
+                </div>");
+    if(type == 1) {
+         renderList(uid, text, $("#card"+uid+">.text"), 3);
+    }
+
+    var card = $("#card" + uid);
+    var movedown = card.actualHeight() + 60;
+
+    col.animate({
+        marginTop: "+=" + movedown
+    }, 70, function () {
+        $("#card" + uid).fadeIn(50);
+        col.css("margin-top", 0);
+    });
+
+    if(dt == null) dt = new Date().getTime();
+    if(colour == null) colour = "white";
+
+    card.data("title", title);
+    card.data("text", text);
+    card.data("type", type);
+    card.data("img", (img==null?"":img));
+    card.data("dt", dt);
+    card.data("colour", colour);
+    card.data("uid", uid);
+
+    setColour(colour, card);
+
+    var cardbin = card.find(".bin"), cardbinimg =card.find(".bin > img");
+    var cardarc = card.find(".archive"), cardarcimg =card.find(".archive > img");
+
+    card.mouseover(function(){
+        cardbin.css("visibility", "visible");
+        cardarc.css("visibility", "visible");
+    });
+    card.mouseout(function(){
+        cardbin.css("visibility", "hidden");
+        cardarc.css("visibility", "hidden");
+    });
+    cardbin.css("visibility", "hidden");
+    cardarc.css("visibility", "hidden");
+
+    cardbin.mouseover(function(){
+        cardbinimg.css("opacity", 0.5);
+    });
+    cardbin.mouseout(function(){
+        cardbinimg.css("opacity", 1);
+    });
+    cardbin.click(function(){
+        removeNote(uid, 1);
+        return false;
+    });
+
+    cardarc.mouseover(function(){
+        cardarcimg.css("opacity", 0.5);
+    });
+    cardarc.mouseout(function(){
+        cardarcimg.css("opacity", 1);
+    });
+    cardarc.click(function(){
+        removeNote(uid, 0);
+        return false;
+    });
+}
+
+function removeNote(uid, del) {
+toastr.clear();
+
+toastr.options = {
+  "closeButton": false,
+  "debug": false,
+  "positionClass": "toast-top-right",
+  "showDuration": "300",
+  "hideDuration": "100",
+  "timeOut": "2000",
+  "extendedTimeOut": "1000",
+  "showEasing": "swing",
+  "hideEasing": "linear",
+  "showMethod": "fadeIn",
+  "hideMethod": "fadeOut"
+}
+toastr.options.onHidden = function() {
+                    $(".card").each(function(){
+                        var me = $(this);
+                        if(me.css('display') == 'none' && me.data("del") == 1) {
+
+                            // tell to delete/archive
+                            if(del==1) {
+                                send($.toJSON({
+                                    'type': "del-note",
+                                    'uid': (me.data("uid")).replace('-','.')
+                                }));
+                            } else {
+                                send($.toJSON({
+                                    'type': (archives==0?"arc-note":"unarc-note"),
+                                    'uid': (me.data("uid")).replace('-','.')
+                                }));
+                            }
+                            me.remove();
+                        }
+                    });
+                 }
+$("#card"+uid).data("del", 1);
+toastr.options.onclick = function(){
+    $("#card"+uid).fadeIn(500);
+    $("#card"+uid).data("del", 0);
+    toastr.clear();
+}    
+    $("#card"+uid).fadeOut(500);
+    
+toastr.info("Click here to undo.", (del==0?(archives==0?"Archived":"Un-archived"):"Deleted")+" item "+$("#card"+uid).data("title"))
+    
+}   
+
+function removeAllCards() {
+    $(".card").each(function(){
+        if($(this).attr("id") != "showCard") {
+            $(this).fadeOut(200, function(){$(this).remove();});
+        }
+    });
+    addLeft=true;
+}
+
+function inputFocus(i) {
+    if (i.value == i.defaultValue) {
+        i.value = "";
+        i.style.opacity = 1;
+    }
+}
+
+function inputBlur(i) {
+    if (i.value == "") {
+        i.value = i.defaultValue;
+        i.style.opacity = 0.7;
+    }
+}
+
+function cardClick(uid) {
+    $(".showTitle").val($("#card" + uid).data("title"));
+    updateField($(".showTitle"));
+    selectedType = $("#card"+uid).data("type");
+    selectedUid = uid;
+    if(selectedType == 0) {
+        $("#showList").hide();
+        $(".showText").show();
+        $(".showText").val($("#card" + uid).data("text"));
+        updateField($(".showText"));
+    } else if(selectedType == 1) {
+        $(".showText").hide();
+        $("#showList").data("value", $("#card" + uid).data("text"));
+        $("#showList").show();
+        listEditor();
+    }
+    updateDT($("#card" + uid).data("dt"));
+    var img=$("#card" + uid).data("img");
+    $("#showCard").data("img", img);
+    if(img == "" || img == null) {
+        // hide img
+        $("#showImg").hide();
+    } else {
+        // show image and set source
+        $("#showImg").show();
+        $("#showImg").css("background-image", "url("+img+")");
+    }
+    showModalCard(uid);
+}
+
+function updateDT(time) {
+    $("#timestamp").html("Last updated: "+new Date(time).customFormat("#DD#/#MM#/#YYYY# #hh#:#mm#"));
+    $("#timestamp").data("dt", time);
+}
+
+function showModalCard(uid) {
+    var showCard = $('#showCard');
+    showCard.css('visibility', 'visible');
+    showCard.css('position', 'fixed');
+    var Xoffset = $("#card" + uid).position();
+    var Xwid = $("#card" + uid).width();
+    var Xheit = $("#card" + uid).height();
+    showCard.css('top', (Xoffset.top + 61) + "px");
+    showCard.css('left', Xoffset.left + "px");
+    showCard.css('width', Xwid + "px");
+    showCard.css('height', Xheit + "px");
+    showCard.data("colour", $("#card" + uid).data("colour"));
+    setColour($("#card" + uid).data("colour"), showCard);
+
+    doShowModal(showCard);
+}
+
+function doShowModal(showCard) {
+    showCard.scrollTop(0);
+    showCard.animate({
+        width: "85%",
+        height: ($(window).height() - 110) + "px",
+        top: "50px",
+        left: "7%"
+    }, 500, function () {
+        // Animation complete.
+
+    $(".showText").trigger('autosize.resize');
+    });
+
+    $(window).resize(function () {
+        $('#showCard').each(function () {
+            $(this).css('height', $(window).height() - 110);
+        })
+    });
+
+    $("#overlay").fadeIn(500);
+
+    $(".shownote").focus(function () {
+        inputFocus(this);
+    });
+
+    $(".shownote").blur(function () {
+        inputBlur(this);
+    });
+    $(".shownote").each(function () {
+        inputFocus(this);
+        inputBlur(this);
+    });
+}
+
+function closeCard() {
+    $("#showCard").css('visibility', 'hidden');
+    $("#overlay").fadeOut(500);
+    selectedUid = null;
+}
+
+function renderList(uid, text, el, num) {
+    el.empty();
+    el.html("<ul class=\"listUl\"></ul>");
+    var lst = el.find(".listUl");
+    // parse uid text and add in checkboxes/list items
+    var lines = text.split('\n');
+    if(num == 0) num = lines.length;
+
+    for(var i = 0;i < Math.min(lines.length, num);i++){
+        var lne = lines[i];
+        if(lne.trim() == "") continue;
+        var lbits = lne.split(/\](.+)/);
+        if(lbits.length > 2) lbits.splice(lbits.length-1,1)
+        if(lbits[0] == "[ ") { // unchecked
+            var ell = $('<li class="unchecked"><input type="checkbox" />'+lbits[1].split(/\|(.+)/)[1].trim()+'</li>');
+            ell.data("ii", i);
+            ell.click(function(){updateCheck($(this).data("ii"), uid, 1); return false;});
+            lst.append(ell);
+        } else { // checked
+            var ell = $('<li class="checked"><input type="checkbox" checked=\"checked\" />'+lbits[1].split(/\|(.+)/)[1].trim()+'</li>');
+            ell.data("ii", i);
+            ell.click(function(){updateCheck($(this).data("ii"), uid, 0); return false;});
+            lst.append(ell);
+        }
+    }
+    if(num < lines.length) {
+        lst.append("...");
+    }
+}
+
+function updateCheck(i, uid, val){
+    // update text
+    var text = $("#card"+uid).data("text");
+    var lines = text.split('\n');
+    var lne = lines[i].split(/\](.+)/);
+    if(lne.length > 2) lne.splice(lne.length-1,1)
+    if(val == 0) {
+        lne[0] = '[ ';
+    } else {
+        lne[0] = '[x';
+    }
+    lne = lne.join(']');
+    lines[i] = lne;
+    text = lines.join('\n');
+    $("#card"+uid).data("text", text)
+    updateDT(new Date().getTime());
+    $("#card"+uid).data("dt", $("#timestamp").data("dt"))
+    // update rendering
+    renderList(uid, text, $("#card"+uid).find(".text"), 3);
+            send($.toJSON({
+                'type': "upd-note",
+                'uid': (uid).replace('-','.'),
+                'title': $("#card"+uid).data("title"),
+                'text': text,
+                'typ': $("#card"+uid).data("type"),
+                'dt': $("#timestamp").data("dt"),
+                'col': $("#card"+uid).data("colour"),
+                'img': $("#card"+uid).data("img")
+            }));
+}
+
+function updateCheckEdit(i, val){
+    // update text
+    var text = $("#showList").data("value");
+    var lines = text.split('\n');
+    var lne = lines[i].split(/\](.+)/);
+    if(lne.length > 2) lne.splice(lne.length-1,1)
+    if(val == 0) {
+        lne[0] = '[ ';
+    } else {
+        lne[0] = '[x';
+    }
+    lne = lne.join(']');
+    lines[i] = lne;
+    text = lines.join('\n');
+    $("#showList").data("value", text)
+    updateDT(new Date().getTime());
+    // update rendering
+    listEditor();
+}
+
+function updateListValEdit(i, val){
+    // update text
+    var text = $("#showList").data("value");
+    var lines = text.split('\n');
+    var lne = lines[i].split(/\](.+)/);
+    if(lne.length > 2) lne.splice(lne.length-1,1);
+    var uuid=lne[1].split(/\|(.+)/)[0];
+    lne[1] = uuid+"| "+val.trim();
+    lne = lne.join('] ');
+    lines[i] = lne;
+    text = lines.join('\n');
+    $("#showList").data("value", text)
+    updateDT(new Date().getTime());
+}
+
+if (typeof String.prototype.endsWith !== 'function') {
+    String.prototype.endsWith = function(suffix) {
+        return this.indexOf(suffix, this.length - suffix.length) !== -1;
+    };
+}
+
+function listEditor() {
+    var text = $("#showList").data("value");
+    var lines = text.split('\n');
+    var el = $("#showList");
+    el.empty();
+    var lst = $("<ul class=\"listUl\"></ul>");
+    el.html(lst);
+
+    for(var i = 0;i < lines.length;i++){
+        if(lines[i].trim()=="") continue;
+        var lbits = lines[i].split(/\](.+)/);
+        if(lbits.length > 2) lbits.splice(lbits.length-1,1)
+        var actualtxt = lbits[1].split(/\|(.+)/);
+        // add editable listitem
+        var checked = 0;
+        if(lbits[0] == "[ ") checked = 0; else checked = 1;
+        listEditorItem(i, (lbits.length<2? "": actualtxt[1].trim()), lst, checked);
+    }
+    // add new item
+    var tempt = $('<input type="text" class="listEntry" />');
+    tempt.val("Enter text here...");
+    tempt.focus(function(){
+        tempt.css("opacity", 1);
+        tempt.val("");
+    });
+    tempt.blur(function(){
+        tempt.css("opacity", 0.7);
+        tempt.val("Enter text here...");
+    });
+    tempt.keypress(function(e){
+        if (e.which !== 0 && e.charCode !== 0) {
+            var kkk = String.fromCharCode(e.which);
+            if($("#showList").data("value").endsWith("\n") || $("#showList").data("value").trim() == "")
+                $("#showList").data("value", $("#showList").data("value")+"[ ] "+guid()+"| "+kkk);
+            else
+                $("#showList").data("value", $("#showList").data("value")+"\n[ ] "+guid()+"| "+kkk);
+            listEditor();
+            var newitem = $("#showList > .listUl > li:last > .listEntry");
+            newitem.focus();
+            var v = newitem.val();
+            newitem.val("");
+            newitem.val(v);
+            return false;
+        }
+    });
+    el.append("<input type=\"checkbox\" disabled=\"disabled\" />");
+    el.append(tempt);
+}
+
+function listEditorItem(i, val, el, checked) {
+    var ell = null;
+    if(checked == 0) {
+        ell = $('<li class="unchecked" id="listEditor'+i+'"><input type="checkbox" /><input type="text" class="listEntry" /></li>');
+        ell.find("input[type=checkbox]").click(function(){
+            updateCheckEdit($(this).parent().data("ii"), 1);
+            return false;
+        });
+    } else { // checked
+        ell = $('<li class="checked" id="listEditor'+i+'"><input type="checkbox" checked="checked" /><input type="text" class="listEntry checked" /></li>');
+        ell.find("input[type=checkbox]").click(function(){
+            updateCheckEdit($(this).parent().data("ii"), 0);
+            return false;
+        });
+    }
+    ell.data("ii", i);
+    ell.find(".listEntry").val(val);
+    ell.find(".listEntry").keyup(function(e){
+        updateListValEdit($(this).parent().data("ii"), $(this).val());
+    });
+    ell.find(".listEntry").keypress(function(e){
+        if (e.keyCode == 13) {
+            var start = e.target.selectionStart;
+            var end = e.target.selectionEnd;
+            var txt = $(this).val();
+            var iii = $(this).parent().data("ii");
+            updateListValEdit(iii, txt.substring(0, start));
+            // insert new entry, val=txt.substring(end)
+            insertListEdit(iii, txt.substring(end));
+            listEditor();
+            // focus on new entry
+            $("#listEditor"+(iii+1)+" > .listEntry").focus();
+        }
+    });
+    ell.find(".listEntry").keyup(function(e){
+        var iii = $(this).parent().data("ii");
+        if($(this).data("oldpos") == 0 && iii !=0 && e.keyCode == 8) {
+            var set = removeListItem(iii, e.target.selectionEnd);
+            listEditor();
+            setCaretToPos($("#listEditor"+(iii-1)+" > .listEntry").get(0), set-1);
+        }
+    });
+    ell.find(".listEntry").keydown(function(e){
+        var iii = $(this).parent().data("ii");
+        if($(this).data("oldlen") == $(this).val().length && iii != $("ul .listEntry").length-1 && e.keyCode == 46) {
+            var set = $(this).val().length;
+            deleteListItem(iii, e.target.selectionStart);
+            listEditor();
+            setCaretToPos($("#listEditor"+(iii)+" > .listEntry").get(0), set);
+        }
+        if(e.keyCode == 38 && iii !=0) {
+            $("#listEditor"+(iii-1)+" > .listEntry").focus();
+        }
+        if(e.keyCode == 38 && iii ==0) {
+            setCaretToPos($("#listEditor0 > .listEntry").get(0), 0);
+        }
+        if(e.keyCode == 40 && iii != $("ul .listEntry").length-1) {
+            $("#listEditor"+(iii+1)+" > .listEntry").focus();
+        }
+        if(e.keyCode == 40 && iii == $("ul .listEntry").length-1) {
+            setCaretToPos($(this).get(0), $(this).val().length);
+        }
+        $(this).data("oldpos", $(this).getCursorPosition());
+        $(this).data("oldlen", $(this).val().length);
+    })
+    el.append(ell);
+}
+
+Date.prototype.customFormat = function(formatString){
+    var YYYY,YY,MMMM,MMM,MM,M,DDDD,DDD,DD,D,hhh,hh,h,mm,m,ss,s,ampm,AMPM,dMod,th;
+    var dateObject = this;
+    YY = ((YYYY=dateObject.getFullYear())+"").slice(-2);
+    MM = (M=dateObject.getMonth()+1)<10?('0'+M):M;
+    MMM = (MMMM=["January","February","March","April","May","June","July","August","September","October","November","December"][M-1]).substring(0,3);
+    DD = (D=dateObject.getDate())<10?('0'+D):D;
+    DDD = (DDDD=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][dateObject.getDay()]).substring(0,3);
+    th=(D>=10&&D<=20)?'th':((dMod=D%10)==1)?'st':(dMod==2)?'nd':(dMod==3)?'rd':'th';
+    formatString = formatString.replace("#YYYY#",YYYY).replace("#YY#",YY).replace("#MMMM#",MMMM).replace("#MMM#",MMM).replace("#MM#",MM).replace("#M#",M).replace("#DDDD#",DDDD).replace("#DDD#",DDD).replace("#DD#",DD).replace("#D#",D).replace("#th#",th);
+
+    h=(hhh=dateObject.getHours());
+    if (h==0) h=24;
+    if (h>12) h-=12;
+    hh = h<10?('0'+h):h;
+    AMPM=(ampm=hhh<12?'am':'pm').toUpperCase();
+    mm=(m=dateObject.getMinutes())<10?('0'+m):m;
+    ss=(s=dateObject.getSeconds())<10?('0'+s):s;
+    return formatString.replace("#hhh#",hhh).replace("#hh#",hh).replace("#h#",h).replace("#mm#",mm).replace("#m#",m).replace("#ss#",ss).replace("#s#",s).replace("#ampm#",ampm).replace("#AMPM#",AMPM);
+}
+
+function insertListEdit(i, val) {
+    //insert text
+    var text = $("#showList").data("value");
+    var lines = text.split('\n');
+    var lne = lines[i].split(/\](.+)/);
+    if(lne.length > 2) lne.splice(lne.length-1,1);
+    var checked = 0;
+    if(lne[0] == "[ ") checked = 0; else checked = 1;
+    lines.splice(i+1, 0, (checked==0?"[ ":"[x")+"]  "+guid()+"| "+val);
+
+    text = lines.join('\n');
+    $("#showList").data("value", text)
+    updateDT(new Date().getTime());
+}
+
+function removeListItem(i, start) {
+    var text = $("#showList").data("value");
+    var lines = text.split('\n');
+    var lne = lines[i].split(/\](.+)/);
+    if(lne.length > 2) lne.splice(lne.length-1,1);
+    if(lne.length < 2) lne[1] = "";
+    var cbits = lne[1].split(/\|(.+)/);
+    var cont = cbits[1];
+    lines.splice(i, 1);
+
+    lne = lines[i-1].split(/\](.+)/);
+    if(lne.length > 2) lne.splice(lne.length-1,1);
+    cbits = lne[1].split(/\|(.+)/);
+    var newcurPos = cbits[1].length;
+
+    lines[i-1] = lines[i-1]+cont;
+
+    text = lines.join('\n');
+    $("#showList").data("value", text)
+    updateDT(new Date().getTime());
+    return newcurPos;
+}
+
+function deleteListItem(i, start) {
+    var text = $("#showList").data("value");
+    var lines = text.split('\n');
+    var lne = lines[i+1].split(/\](.+)/);
+    if(lne.length > 2) lne.splice(lne.length-1,1);
+    if(lne.length < 2) lne[1] = "";
+    var cbits = lne[1].split(/\|(.+)/);
+    var cont = cbits[1];
+    lines.splice(i+1, 1);
+
+    lne = lines[i].split(/\](.+)/);
+    if(lne.length > 2) lne.splice(lne.length-1,1);
+    cbits = lne[1].split(/\|(.+)/);
+    var newcurPos = cbits[1].length;
+
+    lines[i] = lines[i]+cont;
+
+    text = lines.join('\n');
+    $("#showList").data("value", text)
+    updateDT(new Date().getTime());
+}
+
+function toList() {
+var text = $(".showText").val();
+if(text == "Enter note here...") text = "";
+else {
+var lines = text.split('\n');
+for(var i=0;i<lines.length;i++){
+lines[i] = "[ ] "+guid()+"| "+lines[i];
+}
+text = lines.join('\n');
+}
+$(".showText").hide();
+$("#showList").data("value", text);
+$("#showList").show();
+selectedType = 1;
+listEditor();
+    updateDT(new Date().getTime());
+}
+
+function toText() {
+var text = $("#showList").data("value");
+var lines = text.split('\n');
+for(var i=0;i<lines.length;i++){
+if(lines[i].trim() == "") continue;
+    var lne = lines[i].split(/\](.+)/);
+    if(lne.length > 2) lne.splice(lne.length-1,1);
+    if(lne.length < 2) lne[1] = "";
+    lines[i] = lne[1].split(/\|(.+)/)[1].trim();
+}
+text = lines.join('\n');
+$("#showList").hide();
+$(".showText").val(text);
+$(".showText").show();
+    selectedType = 0;
+    updateField($(".showText"));
+    $(".showText").trigger('autosize.resize');
+    updateDT(new Date().getTime());
+}
+/*
+navigator.getUserMedia  = navigator.getUserMedia ||
+                          navigator.webkitGetUserMedia ||
+                          navigator.mozGetUserMedia ||
+                          navigator.msGetUserMedia;
+var video = document.querySelector('video');
+  var canvas = document.querySelector('canvas');
+  var ctx = canvas.getContext('2d');
+  var localMediaStream = null;
+
+function camera() {
+    $("#cam").show();
+    navigator.getUserMedia({video: true}, function(stream) {
+        $("#cam video").attr("src", window.URL.createObjectURL(stream));
+        localMediaStream = stream;
+
+        $('html').on("click.ns", function() {
+            //Hide
+            $('html').off('click.ns');
+            $('.inner').off('click.ns');
+            $("#cam").hide();
+            localMediaStream.stop();
+        });
+        $('.inner').on("click.ns", function(event){
+            event.stopPropagation();
+        });
+        $("#retryPic").hide();
+        $("#takePic").show();
+  }, function(){});
+}*/
+
+function removeImg(e) {
+$("#showCard").data("img", "");
+$("#showImg").hide();
+e.stopPropagation();
+}
+
+var showingPic = 0;
+
+function expandPic(div) {
+showingPic=1;
+var img = $("#showCard").data("img");
+
+$("#ePic").attr("src", img);
+$("#ePic").photoResize({
+bottomSpacing: 15
+});
+$("#expandedPicCont").show();
+$("#expandedPicCont").css("visibility", "hidden");
+
+setTimeout(function(){
+$("#expandedPicCont").css("visibility", "visible");
+$("#expandedPic").css("width", $("#ePic").get(0).clientWidth+"px");
+
+$("#expandedPic").click(function(){
+showingPic=0;
+$("#expandedPicCont").hide();
+});
+}, 100);
+}
+
+var archives=0;
+function toggleArchives() {
+if(archives == 0) {
+archives=1;
+removeAllCards();
+    send('{"type":"show-arc"}');
+} else {
+archives=0;
+removeAllCards();
+    send('{"type":"document-ready"}');
+}
+}
+
+function send(msg) {
+    document.title = "null";
+    document.title = msg;
+}
+
+        </script>
+    </head>
+    <body>
+        <div id="overlay"></div>
+        <div class="content">
+                <div class="cardEntry">
+                    <input type="text" id="entryTitle" class="entryTitle newnote" value="Title..." /><br/>
+                    <textarea class="entryText newnote" id="entryText">Enter note here...</textarea><br />
+<div id="entryPanel"><div id="saveEntry" class="but"><img src="assets/images/save.png" /></div> <div id="expandEntry" class="but"><img src="assets/images/expand.png" /></div></div>
+                </div>
+            <div class="leftColumn">
+                <div class="break"></div>
+            </div>
+            <div class="rightColumn">
+                <div class="break"></div>
+            </div>
+            
+        <div id="showCard" class="card" style="visibility:hidden;z-index:10001;overflow-y:scroll;">
+<div style="position:relative; min-height: 100%;">
+<div id="showImg" class="card-image" style="background-image: url(); display: none;" onclick="expandPic(this)"><div id="delImg"><a href="javascript:;">X</a></div></div>
+                    <div id="closeCard"><a href="javascript:closeCard()">x</a></div>
+                    <div id="colselect"><ul><li id="colwhite" style="background: white;"></li><li id="colred" style="background: #f56545"></li><li id="colorange" style="background: #ffbb22"></li><li id="colyellow" style="background: #eeee22"></li><li id="colgrey" style="background: #b5c5c5"></li><li id="colcyan" style="background: #66ccdd"></li><li id="colturq" style="background: #77ddbb"></li><li id="collime" style="background: #bbe535"></li></ul></div>
+                    <div id="timestamp">Last updated: xx/xx/xxxx hh:mm</div>
+
+                    <input type="text" class="showTitle shownote" value="Title..." id="showTitle" /><br/>
+<div style="padding-bottom: 50px;">
+                    <textarea class="showText shownote" id="showText">Enter note here...</textarea><div id="showList"></div><br/>
+</div>
+
+                    <div style="position: absolute; bottom: 0; left: 0;"><div id="saveShown" class="but"><img src="assets/images/save.png" /></div> <div id="showToList" class="but" onclick="if(selectedType == 0) toList(); else toText();"><img src="assets/images/list.png" /></div> <div id="showAddPicture" class="but"><img src="assets/images/choosepic.png" onclick="javascript:$('#chooseImage').click();" /></div> <!-- <div id="showTakePicture" class="but"><img src="assets/images/camera.png" onclick="camera()" /></div> <div id="showTakeAudio" class="but"><img src="assets/images/record.png" /></div>--></div>
+</div>
+<input type="file" id="chooseImage" style="display:none"  accept="image/*" />
+        </div>
+        </div>
+<!--
+        <div id="cam">
+        <div class="outer">
+        <div class="middle">
+
+        <div class="inner">
+            <video autoplay></video>
+            <canvas style="display:none;"></canvas>
+<div id="takePic"></div><div id="retryPic"></div>
+        </div>
+
+        </div>
+        </div>
+        </div>
+    -->
+
+        <div class="outer" id="expandedPicCont" style="display:none;">
+        <div class="middle">
+        <div class="inner" id="expandedPic">
+            <img src="" id="ePic" />
+        </div>
+        </div>
+        </div>
+
+        <div class="header">
+            <input type="text" class="search" value="" /><div id="toggleArchives" onclick="toggleArchives()"><img src="assets/images/archive.png" /></div>
+        </div>
+        
+        <div class="footer">
+            moosd's notes. Compatible with the Google Keep database.
+        </div>
+    </body>
+</html>
+        
